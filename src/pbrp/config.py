@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 import os
@@ -46,6 +45,65 @@ class Settings:
             raise ConfigurationError(
                 "PBRP_VECTOR_CANDIDATE_COUNT must be greater than or equal to PBRP_RETRIEVAL_LIMIT."
             )
+        return settings
+
+
+@dataclass(frozen=True, slots=True)
+class IngestionSettings:
+    """Azure resources used by the safe paper and repository ingestion path."""
+
+    azure_ai_embedding_deployment_name: str
+    azure_openai_embedding_resource_uri: str
+    azure_search_endpoint: str
+    source_index_name: str
+    source_indexer_name: str
+    knowledge_index_name: str
+    knowledge_semantic_configuration_name: str
+    azure_storage_endpoint: str
+    paper_container_name: str
+    artifact_container_name: str
+    vector_dimensions: int = 1536
+
+    @classmethod
+    def from_env(cls) -> IngestionSettings:
+        settings = cls(
+            azure_ai_embedding_deployment_name=os.getenv(
+                "AZURE_AI_EMBEDDING_DEPLOYMENT_NAME", "text-embedding-3-small"
+            ).strip(),
+            azure_openai_embedding_resource_uri=os.getenv(
+                "AZURE_OPENAI_EMBEDDING_RESOURCE_URI",
+                "https://pbrp-swe-resource.openai.azure.com",
+            ).strip(),
+            azure_search_endpoint=_required_env("AZURE_SEARCH_ENDPOINT"),
+            source_index_name=os.getenv("AZURE_SEARCH_SOURCE_INDEX_NAME", "rag-rp-v1").strip(),
+            source_indexer_name=os.getenv(
+                "AZURE_SEARCH_SOURCE_INDEXER_NAME", "rag-rp-v1-indexer"
+            ).strip(),
+            knowledge_index_name=os.getenv(
+                "AZURE_SEARCH_KNOWLEDGE_INDEX_NAME", "pbrp-knowledge-v2"
+            ).strip(),
+            knowledge_semantic_configuration_name=os.getenv(
+                "AZURE_SEARCH_KNOWLEDGE_SEMANTIC_CONFIGURATION",
+                "pbrp-knowledge-v2-semantic-configuration",
+            ).strip(),
+            azure_storage_endpoint=os.getenv(
+                "AZURE_STORAGE_ENDPOINT",
+                "https://pbrpxdataset.blob.core.windows.net",
+            ).strip(),
+            paper_container_name=os.getenv(
+                "AZURE_STORAGE_PAPER_CONTAINER", "research-papers"
+            ).strip(),
+            artifact_container_name=os.getenv(
+                "AZURE_STORAGE_ARTIFACT_CONTAINER", "outputrp"
+            ).strip(),
+            vector_dimensions=_positive_int_env("PBRP_VECTOR_DIMENSIONS", 1536),
+        )
+        for name, value in (
+            ("AZURE_OPENAI_EMBEDDING_RESOURCE_URI", settings.azure_openai_embedding_resource_uri),
+            ("AZURE_SEARCH_ENDPOINT", settings.azure_search_endpoint),
+            ("AZURE_STORAGE_ENDPOINT", settings.azure_storage_endpoint),
+        ):
+            _validate_https_url(name, value)
         return settings
 
 

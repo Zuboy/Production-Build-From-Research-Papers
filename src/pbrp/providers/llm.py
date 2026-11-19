@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from azure.ai.projects import AIProjectClient
 from azure.core.credentials import TokenCredential
+from azure.identity import get_bearer_token_provider
+from openai import OpenAI
 
 from pbrp.rag.models import RetrievedChunk
 
@@ -60,3 +64,50 @@ class FoundryLLMProvider:
 
         self._openai_client.close()
         self._project_client.close()
+
+
+class AzureOpenAIEmbeddingProvider:
+    """Create embeddings through the Foundry resource's OpenAI v1 endpoint."""
+
+    def __init__(
+        self,
+        *,
+        resource_endpoint: str,
+        deployment_name: str,
+        credential: TokenCredential,
+        dimensions: int = 1536,
+        batch_size: int = 64,
+    ) -> None:
+        if dimensions < 1 or batch_size < 1:
+            raise ValueError("dimensions and batch_size must be greater than zero.")
+        self._deployment_name = deployment_name
+        self._dimensions = dimensions
+        self._batch_size = batch_size
+        token_provider = get_bearer_token_provider(credential, "https://ai.azure.com/.default")
+        self._openai_client = OpenAI(
+            base_url=f"{resource_endpoint.rstrip('/')}/openai/v1/",
+            api_key=token_provider,
+        )
+
+    def embed(self, texts: Sequence[str]) -> list[list[float]]:
+        """Embed non-empty text in bounded, order-preserving batches."""
+
+        normalized = [text.strip() for text in texts]
+        if any(not text for text in normalized):
+            raise ValueError("Embedding inputs cannot be empty.")
+        embeddings: list[list[float]] = []
+        for start in range(0, len(normalized), self._batch_size):
+            batch = normalized[start : start + self._batch_size]
+            response = self._openai_client.embeddings.create(
+                model=self._deployment_name,
+                input=batch,
+                dimensions=self._dimensions,
+            )
+            ordered = sorted(response.data, key=lambda item: item.index)
+            embeddings.extend([item.embedding for item in ordered])
+        if len(embeddings) != len(normalized):
+            raise RuntimeError("Microsoft Foundry returned an unexpected embedding count.")
+        return embeddings
+
+    def close(self) -> None:
+        self._openai_client.close()
