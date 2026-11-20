@@ -45,6 +45,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Store immutable sources and a manifest without changing the Search index.",
     )
+    parser.add_argument(
+        "--skip-source-indexer",
+        action="store_true",
+        help="Reuse paper chunks already present in the source index.",
+    )
     return parser
 
 
@@ -64,7 +69,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             credential=credential,
         )
         embedder = AzureOpenAIEmbeddingProvider(
-            resource_endpoint=settings.azure_openai_embedding_resource_uri,
+            resource_endpoint=settings.azure_ai_model_endpoint,
             deployment_name=settings.azure_ai_embedding_deployment_name,
             credential=credential,
             dimensions=settings.vector_dimensions,
@@ -95,6 +100,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             commit_sha=args.commit,
             run_mode=args.run_mode,
             prepare_only=args.prepare_only,
+            refresh_paper_index=not args.skip_source_indexer,
         )
         _print_result(result, prepare_only=args.prepare_only)
         return 0

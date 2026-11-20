@@ -99,6 +99,7 @@ class IngestionService:
         commit_sha: str,
         run_mode: str = "smoke",
         prepare_only: bool = False,
+        refresh_paper_index: bool = True,
     ) -> IngestionManifest:
         """Run ingestion without importing or executing repository content."""
 
@@ -169,7 +170,8 @@ class IngestionService:
         if prepare_only:
             return manifest
 
-        self._knowledge_index.run_source_indexer()
+        if refresh_paper_index:
+            self._knowledge_index.run_source_indexer()
         paper_chunks = self._knowledge_index.collect_paper_chunks(
             paper_blob_name=paper_path.name,
             paper_blob_uri=paper_blob_uri,
