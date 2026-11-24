@@ -53,7 +53,6 @@ class IngestionSettings:
     """Azure resources used by the safe paper and repository ingestion path."""
 
     azure_ai_embedding_deployment_name: str
-    azure_ai_model_endpoint: str
     azure_openai_embedding_resource_uri: str
     azure_search_endpoint: str
     source_index_name: str
@@ -70,10 +69,6 @@ class IngestionSettings:
         settings = cls(
             azure_ai_embedding_deployment_name=os.getenv(
                 "AZURE_AI_EMBEDDING_DEPLOYMENT_NAME", "text-embedding-3-small"
-            ).strip(),
-            azure_ai_model_endpoint=os.getenv(
-                "AZURE_AI_MODEL_ENDPOINT",
-                "https://pbrp-swe-resource.cognitiveservices.azure.com",
             ).strip(),
             azure_openai_embedding_resource_uri=os.getenv(
                 "AZURE_OPENAI_EMBEDDING_RESOURCE_URI",
@@ -104,54 +99,7 @@ class IngestionSettings:
             vector_dimensions=_positive_int_env("PBRP_VECTOR_DIMENSIONS", 1536),
         )
         for name, value in (
-            ("AZURE_AI_MODEL_ENDPOINT", settings.azure_ai_model_endpoint),
             ("AZURE_OPENAI_EMBEDDING_RESOURCE_URI", settings.azure_openai_embedding_resource_uri),
-            ("AZURE_SEARCH_ENDPOINT", settings.azure_search_endpoint),
-            ("AZURE_STORAGE_ENDPOINT", settings.azure_storage_endpoint),
-        ):
-            _validate_https_url(name, value)
-        return settings
-
-
-@dataclass(frozen=True, slots=True)
-class ProductionSpecSettings:
-    """Azure configuration for evidence-backed ProductionSpec extraction."""
-
-    azure_ai_project_endpoint: str
-    azure_ai_model_deployment_name: str
-    azure_search_endpoint: str
-    azure_search_index_name: str
-    semantic_configuration_name: str
-    azure_storage_endpoint: str
-    artifact_container_name: str
-    retrieval_limit_per_query: int = 6
-    vector_candidate_count: int = 50
-
-    @classmethod
-    def from_env(cls) -> ProductionSpecSettings:
-        settings = cls(
-            azure_ai_project_endpoint=_required_env("AZURE_AI_PROJECT_ENDPOINT"),
-            azure_ai_model_deployment_name=_required_env("AZURE_AI_MODEL_DEPLOYMENT_NAME"),
-            azure_search_endpoint=_required_env("AZURE_SEARCH_ENDPOINT"),
-            azure_search_index_name=os.getenv(
-                "AZURE_SEARCH_INDEX_NAME", "pbrp-knowledge-v2"
-            ).strip(),
-            semantic_configuration_name=os.getenv(
-                "AZURE_SEARCH_SEMANTIC_CONFIGURATION",
-                "pbrp-knowledge-v2-semantic-configuration",
-            ).strip(),
-            azure_storage_endpoint=os.getenv(
-                "AZURE_STORAGE_ENDPOINT",
-                "https://pbrpxdataset.blob.core.windows.net",
-            ).strip(),
-            artifact_container_name=os.getenv(
-                "AZURE_STORAGE_ARTIFACT_CONTAINER", "outputrp"
-            ).strip(),
-            retrieval_limit_per_query=_positive_int_env("PBRP_SPEC_RETRIEVAL_LIMIT_PER_QUERY", 6),
-            vector_candidate_count=_positive_int_env("PBRP_VECTOR_CANDIDATE_COUNT", 50),
-        )
-        for name, value in (
-            ("AZURE_AI_PROJECT_ENDPOINT", settings.azure_ai_project_endpoint),
             ("AZURE_SEARCH_ENDPOINT", settings.azure_search_endpoint),
             ("AZURE_STORAGE_ENDPOINT", settings.azure_storage_endpoint),
         ):

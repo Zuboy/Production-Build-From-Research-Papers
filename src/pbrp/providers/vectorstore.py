@@ -21,12 +21,10 @@ class AzureSearchVectorStore:
         semantic_configuration_name: str,
         vector_field_name: str = "text_vector",
         vector_candidate_count: int = 50,
-        include_evidence_metadata: bool = False,
     ) -> None:
         self._semantic_configuration_name = semantic_configuration_name
         self._vector_field_name = vector_field_name
         self._vector_candidate_count = vector_candidate_count
-        self._include_evidence_metadata = include_evidence_metadata
         self._client = SearchClient(
             endpoint=endpoint,
             index_name=index_name,
@@ -48,27 +46,12 @@ class AzureSearchVectorStore:
             fields=self._vector_field_name,
             k_nearest_neighbors=max(self._vector_candidate_count, limit),
         )
-        select = ["chunk_id", "parent_id", "title", "chunk"]
-        if self._include_evidence_metadata:
-            select.extend(
-                [
-                    "source_type",
-                    "source_uri",
-                    "repository_url",
-                    "commit_sha",
-                    "file_path",
-                    "line_start",
-                    "line_end",
-                    "page_number",
-                    "section",
-                ]
-            )
         search_results = self._client.search(
             search_text=normalized_question,
             vector_queries=[vector_query],
             query_type="semantic",
             semantic_configuration_name=self._semantic_configuration_name,
-            select=select,
+            select=["chunk_id", "parent_id", "title", "chunk"],
             top=limit,
         )
 
@@ -87,15 +70,6 @@ class AzureSearchVectorStore:
                     content=content,
                     search_score=_optional_float(result.get("@search.score")),
                     reranker_score=_optional_float(result.get("@search.reranker_score")),
-                    source_type=_optional_text(result.get("source_type")),
-                    source_uri=_optional_text(result.get("source_uri")),
-                    repository_url=_optional_text(result.get("repository_url")),
-                    commit_sha=_optional_text(result.get("commit_sha")),
-                    file_path=_optional_text(result.get("file_path")),
-                    line_start=_optional_int(result.get("line_start")),
-                    line_end=_optional_int(result.get("line_end")),
-                    page_number=_optional_int(result.get("page_number")),
-                    section=_optional_text(result.get("section")),
                 )
             )
         return chunks
@@ -120,18 +94,5 @@ def _optional_float(value: object) -> float | None:
         try:
             return float(value)
         except ValueError:
-            return None
-    return None
-
-
-def _optional_int(value: object) -> int | None:
-    if value is None or isinstance(value, bool):
-        return None
-    if isinstance(value, int):
-        return value
-    if isinstance(value, (float, str)):
-        try:
-            return int(value)
-        except (TypeError, ValueError):
             return None
     return None

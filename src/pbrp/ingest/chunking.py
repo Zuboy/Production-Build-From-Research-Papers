@@ -32,40 +32,32 @@ def chunk_repository(
             continue
         start = 0
         while start < len(lines):
-            if len(lines[start]) > max_characters:
-                long_line = lines[start].strip()
-                for offset in range(0, len(long_line), max_characters):
-                    content = long_line[offset : offset + max_characters]
-                    if content:
-                        line_number = start + 1
-                        chunks.append(
-                            _build_chunk(
-                                snapshot=snapshot,
-                                document_id=document_id,
-                                file_path=source_file.path,
-                                content=content,
-                                line_start=line_number,
-                                line_end=line_number,
-                                locator_detail=(
-                                    f"C{offset + 1}-C{min(offset + max_characters, len(long_line))}"
-                                ),
-                            )
-                        )
-                        if max_chunks is not None and len(chunks) >= max_chunks:
-                            return chunks
-                start += 1
-                continue
             end = _chunk_end(lines, start, max_characters)
             content = "".join(lines[start:end]).strip()
             if content:
                 line_start = start + 1
                 line_end = end
+                locator = f"{source_file.path}:L{line_start}-L{line_end}"
+                content_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
+                chunk_id = hashlib.sha256(
+                    f"{snapshot.commit_sha}:{locator}:{content_hash}".encode()
+                ).hexdigest()
                 chunks.append(
-                    _build_chunk(
-                        snapshot=snapshot,
+                    KnowledgeChunk(
+                        chunk_id=chunk_id,
+                        parent_id=document_id,
+                        source_type="repository",
                         document_id=document_id,
-                        file_path=source_file.path,
+                        title=f"microsoft/LoRA — {source_file.path}",
                         content=content,
+                        source_uri=(
+                            f"{snapshot.repository_url}/blob/{snapshot.commit_sha}/"
+                            f"{source_file.path}#L{line_start}-L{line_end}"
+                        ),
+                        content_hash=content_hash,
+                        repository_url=snapshot.repository_url,
+                        commit_sha=snapshot.commit_sha,
+                        file_path=source_file.path,
                         line_start=line_start,
                         line_end=line_end,
                     )
@@ -76,45 +68,6 @@ def chunk_repository(
                 break
             start = max(start + 1, end - overlap_lines)
     return chunks
-
-
-def _build_chunk(
-    *,
-    snapshot: RepositorySnapshot,
-    document_id: str,
-    file_path: str,
-    content: str,
-    line_start: int,
-    line_end: int,
-    locator_detail: str | None = None,
-) -> KnowledgeChunk:
-    line_locator = f"L{line_start}-L{line_end}"
-    locator = f"{file_path}:{line_locator}"
-    if locator_detail is not None:
-        locator = f"{locator}:{locator_detail}"
-    content_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
-    chunk_id = hashlib.sha256(
-        f"{snapshot.commit_sha}:{locator}:{content_hash}".encode()
-    ).hexdigest()
-    return KnowledgeChunk(
-        chunk_id=chunk_id,
-        parent_id=document_id,
-        source_type="repository",
-        document_id=document_id,
-        title=f"microsoft/LoRA — {file_path}",
-        content=content,
-        source_uri=(
-            f"{snapshot.repository_url}/blob/{snapshot.commit_sha}/"
-            f"{file_path}#L{line_start}-L{line_end}"
-        ),
-        content_hash=content_hash,
-        repository_url=snapshot.repository_url,
-        commit_sha=snapshot.commit_sha,
-        file_path=file_path,
-        line_start=line_start,
-        line_end=line_end,
-        section=locator_detail,
-    )
 
 
 def _chunk_end(lines: list[str], start: int, max_characters: int) -> int:

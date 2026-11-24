@@ -19,16 +19,12 @@ dependencies = [
 [project.scripts]
 pbrp = "pbrp.cli:main"
 pbrp-ingest-golden = "pbrp.ingest_cli:main"
-pbrp-spec = "pbrp.spec_cli:main"
 
 [tool.setuptools]
 package-dir = { "" = "src" }
 
 [tool.setuptools.packages.find]
 where = ["src"]
-
-[tool.setuptools.package-data]
-pbrp = ["agents/prompts/*.md"]
 
 [tool.ruff]
 line-length = 100

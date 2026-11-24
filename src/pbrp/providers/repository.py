@@ -143,9 +143,6 @@ class GitHubArchiveProvider:
                 except UnicodeDecodeError:
                     skipped.append(relative_path.as_posix())
                     continue
-                if any(len(line) > 50_000 for line in content.splitlines()):
-                    skipped.append(f"{relative_path.as_posix()} (machine-generated line skipped)")
-                    continue
                 files.append(
                     RepositoryFile(
                         path=relative_path.as_posix(),
