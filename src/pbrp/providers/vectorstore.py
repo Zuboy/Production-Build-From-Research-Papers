@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import hashlib
+
 from azure.core.credentials import TokenCredential
 from azure.search.documents import SearchClient
 from azure.search.documents.models import VectorizableTextQuery
 
 from pbrp.rag.models import RetrievedChunk
+from pbrp.spec.models import RunSource
 
 
 class AzureSearchVectorStore:
@@ -35,6 +38,29 @@ class AzureSearchVectorStore:
     def retrieve(self, question: str, limit: int = 5) -> list[RetrievedChunk]:
         """Return the highest-ranked human-readable chunks for a question."""
 
+        return self._retrieve(question, limit)
+
+    def retrieve_source(
+        self, query: str, source: RunSource, source_type: str
+    ) -> list[RetrievedChunk]:
+        """Restrict retrieval to the indexed paper or exact repository commit in a run."""
+
+        if source_type == "paper":
+            paper_id = hashlib.sha256(source.paper_blob_uri.encode()).hexdigest()
+            filters = f"source_type eq 'paper' and document_id eq 'paper:{paper_id}'"
+        elif source_type == "repository":
+            repository = source.repository_url.replace("'", "''")
+            filters = (
+                f"source_type eq 'repository' and commit_sha eq '{source.commit_sha}' "
+                f"and repository_url eq '{repository}'"
+            )
+        else:
+            raise ValueError(f"Unsupported evidence source type: {source_type}")
+        return self._retrieve(query, 6, filters)
+
+    def _retrieve(
+        self, question: str, limit: int, filters: str | None = None
+    ) -> list[RetrievedChunk]:
         normalized_question = question.strip()
         if not normalized_question:
             raise ValueError("The retrieval question cannot be empty.")
@@ -46,12 +72,16 @@ class AzureSearchVectorStore:
             fields=self._vector_field_name,
             k_nearest_neighbors=max(self._vector_candidate_count, limit),
         )
+        fields = ["chunk_id", "parent_id", "title", "chunk"]
+        if filters is not None:
+            fields.extend(("source_type", "source_uri"))
         search_results = self._client.search(
             search_text=normalized_question,
             vector_queries=[vector_query],
             query_type="semantic",
             semantic_configuration_name=self._semantic_configuration_name,
-            select=["chunk_id", "parent_id", "title", "chunk"],
+            select=fields,
+            filter=filters,
             top=limit,
         )
 
@@ -70,6 +100,8 @@ class AzureSearchVectorStore:
                     content=content,
                     search_score=_optional_float(result.get("@search.score")),
                     reranker_score=_optional_float(result.get("@search.reranker_score")),
+                    source_uri=_optional_text(result.get("source_uri")),
+                    source_type=_optional_text(result.get("source_type")),
                 )
             )
         return chunks

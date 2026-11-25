@@ -16,6 +16,8 @@ class RetrievedChunk:
     content: str
     search_score: float | None = None
     reranker_score: float | None = None
+    source_uri: str | None = None
+    source_type: str | None = None
 
     @property
     def locator(self) -> str:

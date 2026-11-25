@@ -15,6 +15,26 @@ class AzureBlobArtifactStore:
     def __init__(self, *, endpoint: str, credential: TokenCredential) -> None:
         self._client = BlobServiceClient(account_url=endpoint, credential=credential)
 
+    def download(self, container_name: str, blob_name: str, *, limit: int = 1_048_576) -> bytes:
+        """Read a bounded run artifact from the configured account."""
+
+        blob = self._client.get_blob_client(container=container_name, blob=blob_name)
+        payload = blob.download_blob(offset=0, length=limit + 1).readall()
+        if len(payload) > limit:
+            raise ValueError("The run artifact exceeds its size limit.")
+        return payload
+
+    def create_json(self, container_name: str, blob_name: str, data: str) -> str:
+        """Create one immutable artifact and surface any naming collision."""
+
+        blob = self._client.get_blob_client(container=container_name, blob=blob_name)
+        blob.upload_blob(
+            data.encode("utf-8"),
+            overwrite=False,
+            content_settings=ContentSettings(content_type="application/json"),
+        )
+        return blob.url
+
     def upload_bytes(
         self,
         *,

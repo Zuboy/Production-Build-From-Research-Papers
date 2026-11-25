@@ -12,6 +12,8 @@ dependencies = [
     "azure-identity>=1.17.0,<2",
     "azure-search-documents>=11.6.0,<13",
     "azure-storage-blob>=12.28.0,<13",
+    "azure-storage-queue>=12.13.0,<13",
+    "langchain-azure-ai[hosting,opentelemetry]>=1.4.0,<2",
     "openai>=3.0.0,<4",
     "pydantic>=2.12.0,<3",
 ]
@@ -19,12 +21,17 @@ dependencies = [
 [project.scripts]
 pbrp = "pbrp.cli:main"
 pbrp-ingest-golden = "pbrp.ingest_cli:main"
+pbrp-spec = "pbrp.spec_cli:main"
+pbrp-smoke = "pbrp.smoke_cli:main"
 
 [tool.setuptools]
 package-dir = { "" = "src" }
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+pbrp = ["agents/prompts/*.md"]
 
 [tool.ruff]
 line-length = 100

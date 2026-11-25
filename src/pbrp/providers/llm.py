@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from importlib.resources import files
+from json import dumps
 
 from azure.ai.projects import AIProjectClient
 from azure.core.credentials import TokenCredential
@@ -10,6 +12,7 @@ from azure.identity import get_bearer_token_provider
 from openai import OpenAI
 
 from pbrp.rag.models import RetrievedChunk
+from pbrp.spec.models import SpecDraft
 
 GROUNDING_INSTRUCTIONS = """\
 You are an evidence-grounded research assistant.
@@ -64,6 +67,33 @@ class FoundryLLMProvider:
 
         self._openai_client.close()
         self._project_client.close()
+
+    def extract(self, chunks: list[RetrievedChunk]) -> SpecDraft:
+        prompt = files("pbrp").joinpath("agents/prompts/production-spec-v1.md")
+        response = self._openai_client.responses.create(
+            model=self._deployment_name,
+            instructions=prompt.read_text(encoding="utf-8"),
+            input=dumps(
+                [
+                    {"source_id": chunk.source_id, "kind": chunk.source_type, "text": chunk.content}
+                    for chunk in chunks
+                ],
+                ensure_ascii=False,
+            ),
+            text={
+                "format": {
+                    "type": "json_schema",
+                    "name": "production_spec_draft",
+                    "schema": SpecDraft.model_json_schema(),
+                    "strict": True,
+                }
+            },
+            reasoning={"effort": "low"},
+            max_output_tokens=7500,
+        )
+        if response.status != "completed" or not response.output_text:
+            raise RuntimeError("Foundry did not return a complete structured specification.")
+        return SpecDraft.model_validate_json(response.output_text)
 
 
 class AzureOpenAIEmbeddingProvider:
